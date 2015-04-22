@@ -178,7 +178,7 @@ class NodeClass
     zero_pose_.pose.orientation.z = 0.0;
     zero_pose_.pose.orientation.w = 1.0;
     zero_pose_.header.frame_id = robot_frame_;
-    zero_pose_.header.stamp = ros::Time::now();
+    zero_pose_.header.stamp = ros::Time(0);
     robot_pose_global_ = zero_pose_;
     robot_pose_global_.header.frame_id = global_frame_;
     goal_pose_global_ = robot_pose_global_;
@@ -192,7 +192,7 @@ class NodeClass
     //we need to make sure that the transform between the robot base frame and the global frame is available
     ros::Time last_error = ros::Time::now();
     std::string tf_error;
-    while(!tf_listener_.waitForTransform(global_frame_, robot_frame_, ros::Time(), ros::Duration(0.1), ros::Duration(0.01), &tf_error)) {
+    while(!tf_listener_.waitForTransform(global_frame_, robot_frame_, ros::Time(0), ros::Duration(0.1), ros::Duration(0.01), &tf_error)) {
       ros::spinOnce();
       if(last_error + ros::Duration(5.0) < ros::Time::now()){
         ROS_WARN("Waiting on transform from %s to %s to become available before running cob_linear_nav, tf error: %s", 
@@ -385,13 +385,20 @@ bool NodeClass::getUseMoveAction(void)
 }
 
 geometry_msgs::PoseStamped NodeClass::transformGoalToMap(geometry_msgs::PoseStamped goal_pose) {
+try{
   geometry_msgs::PoseStamped goal_global_;
+  goal_pose.header.stamp = ros::Time(0);
   if(goal_pose.header.frame_id == global_frame_) return goal_pose;
   else if(tf_listener_.canTransform(global_frame_, goal_pose.header.frame_id, ros::Time(0), new std::string)) {
-    tf_listener_.transformPose(global_frame_, ros::Time(0), goal_pose, "base_link", goal_global_);
+    tf_listener_.transformPose(global_frame_, goal_pose, goal_global_);
     return goal_global_;
   } else {
     ROS_WARN("Can't transform goal to global frame %s", global_frame_.c_str());
+    return robot_pose_global_;
+  }
+  }
+catch(tf::TransformException& ex){
+    ROS_WARN("Failed to transform goal to map");
     return robot_pose_global_;
   }
 }
